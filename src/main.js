@@ -11,6 +11,8 @@ Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
+export const eventBus = new Vue();
+
 Vue.config.productionTip = false
 
 new Vue({

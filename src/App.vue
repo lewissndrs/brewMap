@@ -1,8 +1,10 @@
 <template>
 <div id='app'>
   <h1>BREWMAP</h1>
+  <button v-on:click="newSearch">New Search</button>
+  <state-drop-down :states='statesList' v-if="isStatesList"></state-drop-down>
+  <button v-on:click="showSelectedState" v-if="isStatesList">Let's Go!</button>
   <div id='map' style="height: 500px; width: 70%; overflow: auto;">
-    <button v-on:click="getBounds">BOUNDZ</button>
     <l-map 
       style="height: 80%"
       :zoom ="zoom"
@@ -14,12 +16,16 @@
           :url='url'
           :attribution='attribution'
         />
-
-        <l-marker :lat-lng='marker1'/>
-        <l-marker :lat-lng='marker2'/>
         
-        <div v-for="(point, index) in coOrdList" :key='index'>
-          <l-marker :lat-lng='point' />
+        <div v-for="(brewery, index) in filteredList" :key='index'>
+          <l-marker :lat-lng='[brewery.latitude,brewery.longitude]' >
+          <l-popup>
+            <div  @click="linkClick(brewery.website_url)">
+            <p>{{ brewery.name }}</p>
+            <p><a>{{ brewery.website_url }}</a></p>
+            </div>
+          </l-popup>
+          </l-marker>
         </div>
 
     </l-map>
@@ -30,6 +36,8 @@
 <script>
 import {latLng,latLngBounds,getBounds,getCenter} from 'leaflet';
 import { LMap, LTileLayer, LMarker, LPopup, LTooltip, LIcon } from 'vue2-leaflet';
+import stateDropDown from './components/stateDropDown';
+import { eventBus } from './main.js'
 export default {
   name: "app",
   components: {
@@ -38,17 +46,20 @@ export default {
     LMarker,
     LPopup,
     LTooltip,
-    LIcon
+    LIcon,
+    'state-drop-down': stateDropDown
   },
   data() {
     return {
-      marker1: [47.41322, -1.219482],
-      marker2: latLng(47.41422, -1.250482),
       bounds: null,
-      dataHolder: [],
 
-      center: [47.41322, -1.219482],
-      zoom: 13,
+      dataHolder: [],
+      statesList: [],
+
+      selectedState: null,
+
+      center: [43.1246149738464, -113.31158377965275],
+      zoom: 3,
       mapOptions:{
         zoomSnap: 0.5
       },
@@ -57,12 +68,15 @@ export default {
     }
   },
   mounted() {
-    this.getData()
+    this.getData();
+
+    eventBus.$on('state-selected',(state) => {this.selectedState = state})
   },
   methods: {
+    
     getData: function() {
 
-      const promises = [1, 2, 3, 4, 5].map(num => {
+      const promises = [1, 2, 3, 4, 5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].map(num => {
         return fetch(
           `https://api.openbrewerydb.org/breweries?page=${num}&per_page=50`
         ).then(res => res.json());
@@ -76,13 +90,35 @@ export default {
         return concatResults
       })
       .then(data => this.dataHolder = data)
-
-      // const request = fetch('https://api.openbrewerydb.org/breweries')
-      // .then(response => response.json())
-      // .then(data => this.dataHolder = data)
     },
-    innerClick: function() {
-      alert("Click!");
+
+    getStateData: function() {
+      const state = this.selectedState.toLowerCase()
+        const promises = [1, 2, 3, 4, 5, 6 , 7 , 8, 9, 10].map(num => {
+        return fetch(
+          `https://api.openbrewerydb.org/breweries?by_state=${state}&page=${num}&per_page=50`
+        ).then(res => res.json());
+      });
+
+      Promise.all(promises)
+      .then(data => {
+        const concatResults = data.reduce((running,toAdd) => {
+          return running.concat(toAdd)
+        },[])
+        return concatResults
+      })
+      .then(data => this.dataHolder = data)
+    },
+
+    getStatesList: function() {
+      // get list of states
+      const stateList = this.filteredList.map((brewery) => brewery.state)
+      // reduce to unique states
+      this.statesList = stateList.filter((state,index) => stateList.indexOf(state) === index);
+    },
+
+    linkClick: function(url) {
+      window.open(url,'_blank');
     },
     getBounds: function() {
       // find lowest and highest latitude and longitude
@@ -103,16 +139,28 @@ export default {
       const bounds = latLngBounds(minCoOrd,maxCoOrd);
       this.bounds = bounds;
       this.center = bounds.getCenter();
+    },
+    newSearch: function(){
+      this.getData();
+      this.getBounds();
+      this.getStatesList();
+    },
+    showSelectedState: function(){
+      this.getStateData();
+      this.getBounds(); // this needs to occur once getStateData has run!!!
     }
+
   },
   computed: {
 
-    filteredList: function () {
+    filteredList: function() {
       // filter breweries with no name, coordinates or website
       return this.dataHolder.filter((brewery) => {
         return (brewery.latitude && brewery.longitude && brewery.website_url && brewery.name)
-      })
+      });
     },
+
+
     coOrdList: function() {
       // return list of coordinates
       return this.filteredList.map((brewery) => {
@@ -121,9 +169,18 @@ export default {
         const result = [lat,long]
         return result;
       })
+    },
+
+    isStatesList: function() {
+      if (this.statesList[1]) {
+        return true;
+     } else {
+       return false;
+     }
+    }
+
     }
   }
-}
 </script>
 
 <style>
